@@ -13,7 +13,11 @@ IrcTransform.prototype._transform = function(chunk, encoding, done) {
     var lines = chunkString.split('\n');
 
     lines.slice(0, lines.length - 1).forEach(function(line) {
-	console.log(line);
+	var tokens = line.split(' ');
+	
+	tokens.forEach(function(token) {
+	    console.log(token);
+	});
     });
 
     done();
