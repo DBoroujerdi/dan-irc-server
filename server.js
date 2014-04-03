@@ -4,6 +4,13 @@ var util = require('util');
 
 util.inherits(IrcTransform, Transform);
 
+// TODOs
+// channel object
+// client manager object
+// client manager - manager adds and removes from multiple channels channels
+// welcome message lists channels that can be connected to
+// only store client for broadcasting when it identifies itself with 'USER' command
+
 function IrcTransform(opt) {
     Transform.call(this, opt);
 }
