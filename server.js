@@ -9,6 +9,7 @@ function IrcTransform(opt) {
 }
 
 IrcTransform.prototype._transform = function(chunk, encoding, done) {
+    console.log('Received chunk ..');
     var chunkString = chunk.toString();
     var lines = chunkString.split('\n');
 
@@ -25,11 +26,14 @@ IrcTransform.prototype._transform = function(chunk, encoding, done) {
 
 var ircTransform = new IrcTransform;
 
+var clients = [];
+
 var server = net.createServer(function(socket) {
-    console.log('Client connected ...');
+    console.log('Client [' + socket.remoteAddress + '] connected ...');
     socket.write('Welcome to my IRC server ...\r\n');
 
     // readable -- pipe --> writeable
+    clients.push(socket);
     socket.pipe(ircTransform);
 });
 
