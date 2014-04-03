@@ -1,28 +1,32 @@
 var net = require("net");
-var Writable = require('stream').Writable;
+var Transform = require('stream').Transform;
 var util = require('util');
 
-util.inherits(IrcWritable, Writable);
+util.inherits(IrcTransform, Transform);
 
-function IrcWritable(opt) {
-    Writable.call(this, opt);
+function IrcTransform(opt) {
+    Transform.call(this, opt);
 }
 
-IrcWritable.prototype._write = function(chunk, encoding, callback) {
-    console.log("Received chunks from client ...");
-    console.log(chunk.toString());
+IrcTransform.prototype._transform = function(chunk, encoding, done) {
+    var chunkString = chunk.toString();
+    var lines = chunkString.split('\n');
 
-    callback();
+    lines.slice(0, lines.length - 1).forEach(function(line) {
+	console.log(line);
+    });
+
+    done();
 };
 
-var ircWritable = new IrcWritable;
+var ircTransform = new IrcTransform;
 
 var server = net.createServer(function(socket) {
     console.log('Client connected ...');
     socket.write('Welcome to my IRC server ...\r\n');
 
     // readable -- pipe --> writeable
-    socket.pipe(ircWritable);
+    socket.pipe(ircTransform);
 });
 
 server.listen(6667, function() {
