@@ -7,7 +7,6 @@ var util = require('util')
 // client manager - manager adds and removes from multiple channels channels
 // welcome message lists channels that can be connected to
 // only store client for broadcasting when it identifies itself with 'USER' command
-// write tranform stream to parse chunks into individual commands
 
 util.inherits(IrcWritable, stream.Writable)
 
@@ -35,11 +34,13 @@ IrcWritable.prototype._write = function(chunk, encoding, done) {
 	
 	switch (command) {
 	case 'NICK':
+	    console.log('emitting NICK')
 	    self.emit('NICK', {
 		params: tokens.slice(1, tokens.length)
 	    })
 	    break;
 	case 'USER':
+	    console.log('emitting USER')
 	    self.emit('USER', {
 		params: tokens.slice(1, tokens.length)
 	    })
@@ -51,6 +52,8 @@ IrcWritable.prototype._write = function(chunk, encoding, done) {
 
     done()
 }
+
+
 
 var clients = (function () {
     var keys = [], values = []
@@ -117,7 +120,7 @@ var server = net.createServer(function(socket) {
 	console.log('on NICK ' + d.params)
 	// TODO
     });
-    ircWritable.on('on USER', function(d) {
+    ircWritable.on('USER', function(d) {
 	console.log('on USER ' + d.params)
 	// TODO
     });
