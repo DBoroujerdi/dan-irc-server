@@ -1,6 +1,5 @@
 var net = require("net")
-var Transform = require('stream').Transform
-var Writable = require('stream').Writable
+var stream = require('stream')
 var util = require('util')
 
 // TODOs
@@ -8,45 +7,46 @@ var util = require('util')
 // client manager - manager adds and removes from multiple channels channels
 // welcome message lists channels that can be connected to
 // only store client for broadcasting when it identifies itself with 'USER' command
+// write tranform stream to parse chunks into individual commands
 
-util.inherits(IrcEngine, Writable)
-
-
-function IrcEngine(options) {
-    Writable.call(this, options)
-}
-
-IrcEngine.prototype.write = function(chunk, encoding, done) {
-    // TODO
-}
-
-IrcEngine.prototype.receive = function(command) {
-    // TODO
-}
-
-util.inherits(IrcTransform, Transform)
+util.inherits(IrcWritable, stream.Writable)
 
 // one transformer per client
 // holds client information
 // pipes to irc engine once user is known
-function IrcTransform(options, clientAddress) {
-    Transform.call(this, options)
+function IrcWritable(clientAddress) {
+    stream.Writable.call(this)
     
     this._clientAddress = clientAddress
     this._name = undefined
 }
 
-IrcTransform.prototype._transform = function(chunk, encoding, done) {
-    console.log('Received chunk ..')
+IrcWritable.prototype._write = function(chunk, encoding, done) {
+    console.log('Received chunk ..' + chunk.toString())
+    var self = this;
     var chunkString = chunk.toString()
     var lines = chunkString.split('\n')
 
+    var commandObject
+
     lines.slice(0, lines.length - 1).forEach(function(line) {
 	var tokens = line.split(' ')
+	var command = tokens[0]
 	
-	tokens.forEach(function(token) {
-	    console.log(token)
-	})
+	switch (command) {
+	case 'NICK':
+	    self.emit('NICK', {
+		params: tokens.slice(1, tokens.length)
+	    })
+	    break;
+	case 'USER':
+	    self.emit('USER', {
+		params: tokens.slice(1, tokens.length)
+	    })
+	    break;
+	default:
+	    console.log('Unkown command [' + command + '], ignoring ...')
+	}
     })
 
     done()
@@ -108,10 +108,19 @@ var server = net.createServer(function(socket) {
     })
     
     // create transformer for client ...
-    var ircTransform = new IrcTransform 
+    var ircWritable = new IrcWritable(clientAddress) 
 
     // readable -- pipe --> writeable
-    socket.pipe(ircTransform)
+    socket.pipe(ircWritable)
+
+    ircWritable.on('NICK', function(d) {
+	console.log('on NICK ' + d.params)
+	// TODO
+    });
+    ircWritable.on('on USER', function(d) {
+	console.log('on USER ' + d.params)
+	// TODO
+    });
 })
 
 function removeClient(client) {
@@ -124,6 +133,3 @@ function removeClient(client) {
 server.listen(6667, function() {
     console.log('IRC server started listening on port 6667 ...')
 })
-
-
-
