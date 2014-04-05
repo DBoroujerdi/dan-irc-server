@@ -18,7 +18,7 @@ function Set() {
 	    return at > -1
 	},
 	add: function(item) {
-	    var at = items.indexOf(key)
+	    var at = items.indexOf(item)
             if (at < 0) {
                 at = items.length
             } else {
@@ -32,6 +32,9 @@ function Set() {
             if (at >= 0) {
                 items.splice(at, 1)
             }
+	},
+	getAll: function() {
+	    return items.slice(0)
 	}
     }
 }
@@ -74,8 +77,6 @@ function Channel(name, topic) {
     var topic = topic
     var members = new Set
 
-    console.log('Created channel [' + name + ']' + ' with topic [' + topic + ']')
-
     return {
 	getName: function() {
 	    return name
@@ -91,11 +92,22 @@ function Channel(name, topic) {
 	},
 	setTopic: function(newTopic) {
 	    topic = newTopic
+	},
+	getUserList: function() {
+	    var membersString = ''
+	    var membersArray = members.getAll()
+	    membersArray.forEach(function(member) {
+		membersString = membersString + ' '
+	    })
+	    return membersString
 	}
     }
 }
 
-var defaultChannel = new Channel('default', 'this is the topic')
+var defaultChannel = new Channel('#default', 'this is the topic')
+
+var channels = new Map
+channels.put(defaultChannel.getName(), defaultChannel)
 
 util.inherits(IrcWritable, stream.Writable)
 
@@ -122,25 +134,23 @@ IrcWritable.prototype._write = function(chunk, encoding, done) {
 	
 	switch (command) {
 	case 'NICK':
-	    console.log('emitting NICK')
 	    self.emit('NICK', {
 		client: self._clientAddress,
 		params: tokens.slice(1, tokens.length)
 	    })
 	    break;
 	case 'USER':
-	    console.log('emitting USER')
 	    self.emit('USER', {
 		client: self._clientAddress,
 		params: tokens.slice(1, tokens.length)
 	    })
 	    break;
 	case 'JOIN':
-	    console.log('emitting JOIN')
-	    self.emit('USER', {
+	    self.emit('JOIN', {
 		client: self._clientAddress,
 		channel: tokens[1]
 	    })
+	    break;
 	default:
 	    console.log('Unkown command [' + command + '], ignoring ...')
 	}
@@ -186,16 +196,27 @@ var server = net.createServer(function(socket) {
     socket.pipe(ircWritable)
 
     ircWritable.on('NICK', function(d) {
-	console.log('on NICK ' + d.params)
+	console.log(JSON.stringify(d))
 	// TODO
     });
     ircWritable.on('USER', function(d) {
-	console.log('on USER ' + d.params)
+	console.log(JSON.stringify(d))
+	var client = clients.get(d.client)
+	client.write('USER not implemented yet ..')
 	// TODO
     });
     ircWritable.on('JOIN', function(d) {
-	console.log('on JOIN' + d.channel)
-	// TODO
+	console.log(JSON.stringify(d))
+	if (channels.contains(d.channel)) {
+	    var channel = channels.get(d.channel)
+	    if (!channel.containsMember(d.client)) {
+		channel.addMember(d.client)
+		var client = clients.get(d.client)
+		client.write('JOIN ' + channel.getName())
+		client.write('RPL_TOPIC ' + channel.getTopic())
+		client.write('RPL_NAMREPLY ' + channel.getUserList() + ' ' + d.client)
+	    }
+	}
     });
 })
 
