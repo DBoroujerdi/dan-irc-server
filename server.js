@@ -1,6 +1,7 @@
 var net = require("net")
 var stream = require('stream')
 var util = require('util')
+var log = require('winston')
 
 // TODOs
 // client manager object
@@ -152,7 +153,7 @@ IrcWritable.prototype._write = function(chunk, encoding, done) {
 	    })
 	    break;
 	default:
-	    console.log('Unkown command [' + command + '], ignoring ...')
+	    log.warn('Unkown command [' + command + '], ignoring ...')
 	}
     })
 
@@ -163,7 +164,7 @@ var clients = new Map
 
 function removeClient(client) {
     if (clients.contains(client)) {
-	console.log('Socket closed/ended, removing client [' + client + '] ...')
+	log.info('Socket closed/ended, removing client [' + client + '] ...')
 	clients.remove(client)
     }
 }
@@ -171,7 +172,7 @@ function removeClient(client) {
 var server = net.createServer(function(socket) {
     var clientAddress = socket.remoteAddress
 
-    console.log('Client [' + clientAddress + '] connected ...')
+    log.info('Client [' + clientAddress + '] connected ...')
 
     if (!clients.contains(clientAddress)) {
 	clients.put(clientAddress, socket)
@@ -196,30 +197,31 @@ var server = net.createServer(function(socket) {
     socket.pipe(ircWritable)
 
     ircWritable.on('NICK', function(d) {
-	console.log(JSON.stringify(d))
+	log.info(JSON.stringify(d))
 	// TODO
     });
     ircWritable.on('USER', function(d) {
-	console.log(JSON.stringify(d))
+	log.info(JSON.stringify(d))
 	var client = clients.get(d.client)
 	client.write('USER not implemented yet ..')
 	// TODO
     });
     ircWritable.on('JOIN', function(d) {
-	console.log(JSON.stringify(d))
+	log.info(JSON.stringify(d))
 	if (channels.contains(d.channel)) {
 	    var channel = channels.get(d.channel)
 	    if (!channel.containsMember(d.client)) {
 		channel.addMember(d.client)
 		var client = clients.get(d.client)
-		client.write('JOIN ' + channel.getName())
-		client.write('RPL_TOPIC ' + channel.getTopic())
-		client.write('RPL_NAMREPLY ' + channel.getUserList() + ' ' + d.client)
+		client.write(channel.getTopic())
+		client.write('/JOIN ' + channel.getName())
+		client.write('/RPL_TOPIC ' + channel.getTopic())
+		client.write('/RPL_NAMREPLY ' + d.client)
 	    }
 	}
     });
 })
 
 server.listen(6667, function() {
-    console.log('IRC server started listening on port 6667 ...')
+    log.info('IRC server started listening on port 6667 ...')
 })
