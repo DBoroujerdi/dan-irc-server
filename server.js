@@ -363,6 +363,10 @@ function Connection(uuid, socket) {
     }
 }
 
+//
+// Startup code
+//
+
 var config = {
     port: 6667,
     welcomeMessage: 'Welcome to my IRC server ...',
@@ -377,11 +381,6 @@ var config = {
 	}
     ]
 }
-
-
-//
-// Startup code
-//
 
 var server = new Server(config)
 server.start()
