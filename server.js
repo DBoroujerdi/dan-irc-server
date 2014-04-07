@@ -4,12 +4,19 @@ var util = require('util')
 var log = require('winston')
 var uuid = require('node-uuid')
 
+//************************************************************
 // TODOs
 // welcome message lists channels that can be connected to
 // rename ircWirtable to clientStream or ircClientStream
 // create package.json
 // create readme.md
 // create config system to define default behaviour and features. eg. channels, welcome message
+//*************************************************************
+
+
+//
+// Utils
+//
 
 function Set() {
     var items = []
@@ -71,6 +78,18 @@ function Map() {
                 values.splice(at, 1)
             }
         }
+    }
+}
+
+
+//
+// IRC Server
+//
+
+var protocol = {
+    commands: {
+	NICK: 'NICK',
+	JOIN: 'JOIN'
     }
 }
 
@@ -358,6 +377,11 @@ var config = {
 	}
     ]
 }
+
+
+//
+// Startup code
+//
 
 var server = new Server(config)
 server.start()
