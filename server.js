@@ -480,11 +480,11 @@ var config = {
     welcomeMessage: 'Welcome to my IRC server ...',
     channels: [
 	{
-	    name: 'default',
+	    name: '#default',
 	    topic: 'this is the topic'
 	},
 	{
-	    name: 'cats',
+	    name: '#cats',
 	    topic: 'We actually hate cats'
 	}
     ]
