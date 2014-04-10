@@ -241,7 +241,15 @@ function CommandFactory() {
 	    user.setNick(nickname)
 	},
 	'USER': function(command, user, server) {
-	    log.warn('Not yet implemented executor for USER')
+	    var realName = command.getArg('REALNAME')
+	    var hostName = command.getArg('HOSTNAME')
+	    var mode = command.getArg('MODE')
+	    var userName = command.getArg('USERNAME')
+
+	    user.setHostName(hostName)
+	    user.setMode(mode)
+	    user.setRealName(realName)
+	    user.setUserName(userName)
 	}
     }
 
@@ -258,19 +266,21 @@ function CommandFactory() {
 		var args = tokens.slice(1, tokens.length)
 		var nickName = tokens[1]
 
-		argMap.put(Protocol.args.NICKNAME, nickName)
+		argMap.put('NICKNAME', nickName)
 
 		return new Command('NICK', argMap, user, executors.NICK)
 		break;
 	    case 'USER':
 		var args = tokens.slice(1, tokens.length)
 		var realName = tokens[4] + ' ' + tokens[5]
-		var user = tokens[1]
+		var userName = tokens[1]
 		var mode = tokens[2]
+		var hostName = tokens[3]
 
-		argMap.put(Protocol.args.REALNAME, realName)
-		argMap.put(Protocol.args.MODE, mode)
-		argMap.put(Protocol.args.USER, user)
+		argMap.put('REALNAME', realName)
+		argMap.put('MODE', mode)
+		argMap.put('USERNAME', userName)
+		argMap.put('HOSTNAME', hostName)
 		
 		return new Command('USER', argMap, user, executors.USER)
 		break;
@@ -305,9 +315,6 @@ function Command(name, argsMap, user, executor) {
 	getArg: function(argName) {
 	    return argsMap.get(argName)
 	},
-	getUser: function() {
-	    return user
-	},
 	toString: function() {
 	    // TODO user as well
 	    return 'Command[' + name + ' Args[' + args.join() + ']]'
@@ -334,7 +341,12 @@ function User(connection, server, commandFactory) {
     var socket = connection.getSocket()
     var connectionUuid = connection.getUuid()
     var self = this
+    
     var nick = undefined
+    var hostName = undefined
+    var mode = undefined
+    var realName = undefined
+    var userName = undefined
 
     function setUpDataHandler(user) {
 	// datahandler has access to user and server
@@ -378,15 +390,31 @@ function User(connection, server, commandFactory) {
 		log.error('could not send message to client [%s] because of error [%s]', address, e)
 	    }
 	},
-	setNick: function(newNick) {
-	    log.info('Setting user nick with connection UUID [%s] from [%s] to [%s]', this.getConnectionUuid(), nick, newNick)
-	    nick = newNick
-	},
 	getConnectionUuid: function() {
 	    return connection.getUuid()
 	},
 	init: function() {
 	    socket.on('data', setUpDataHandler(this))
+	},
+	setNick: function(newNick) {
+	    log.info('Setting user \"Nick\" with connection UUID [%s] from [%s] to [%s]', this.getConnectionUuid(), nick, newNick)
+	    nick = newNick
+	},
+	setRealName: function(newRealName) {
+	    log.info('Setting user \"Real Name\" with connection UUID [%s] from [%s] to [%s]', this.getConnectionUuid(), realName, newRealName)
+	    realName = newRealName
+	},
+	setUserName: function(newUserName) {
+	    log.info('Setting user \"User Name\" with connection UUID [%s] from [%s] to [%s]', this.getConnectionUuid(), userName, newUserName)
+	    userName = newUserName
+	},
+	setHostName: function(newHostName) {
+	    log.info('Setting user \"Host Name\" with connection UUID [%s] from [%s] to [%s]', this.getConnectionUuid(), hostName, newHostName)
+	    hostName = newHostName
+	},
+	setMode: function(newMode) {
+	    log.info('Setting user \"Mode\" with connection UUID [%s] from [%s] to [%s]', this.getConnectionUuid(), mode, newMode)
+	    mode = newMode
 	}
     }
 }
