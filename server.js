@@ -102,7 +102,7 @@ var Protocol = {
 }
 
 function Channel(name, topic) {
-    this.name = name
+    var name = name
     this.topic = topic
     var members = new Set
 
@@ -111,9 +111,11 @@ function Channel(name, topic) {
 	    return members.contains(member)
 	},
 	addMember: function(member) {
+	    log.info('Adding user [%s] to channel [%s]', member.getNickName(), name)
 	    members.add(member)
-	    members.all().forEach(function(member) {
-		member.send('JOIN ' + member.nick)
+	    log.info('Notifying all members of channel [%s] ...', name)
+	    members.getAll().forEach(function(m) {
+		m.send(['/JOIN', name])
 	    })
 	},
 	setTopic: function(newTopic) {
@@ -131,41 +133,34 @@ function Channel(name, topic) {
     }
 }
 
-// TODO
-// should contain the ability to broadcast to many clients such
-// as in a channel for example
-function ClientStore() {
-    var clients = new Map
-
-    return {
-	
-    }
-}
-
 function ChannelRepo() {
     var channelsMap = new Map
 
     return {
+	exists: function(channelName) {
+	    log.info('Checking if channel [%s] exists ...', channelName)
+	    return channelsMap.contains(channelName)
+	},
 	addChannels: function(channels) {
-	    channels.forEach(function(channel) {
-		log.info('Adding channel [%s] to ChannelRepo ...', channel.name)
-		channelsMap.put(channel.name, channel)
+	    channels.forEach(function(c) {
+		log.info('Adding channel [%s] to ChannelRepo ...', c.name)
+		var channel = new Channel(c.name, c.topic)
+		channelsMap.put(c.name, channel)
 	    })
 	},
-	addChannel: function(channel) {
-	    // TODO log
-	    channelsMap.put(channel.name, channel)
-	},
 	addUserToChannel: function(channelName, user) {
-	    log.info('adding user [%s] to channel [%s]', user.name, channelName)
+	    log.info('adding user [%s] to channel [%s]', user.getNickName(), channelName)
 	    var channel = channelsMap.get(channelName)
+	    if (channel === undefined) {
+		log.warn('Channel [%s] does not exist, unable to add user', channelName)
+		return
+	    }
+	    log.info('channel [%s] exists!', channelName)
 	    channel.addMember(user)
 	}
     }
 }
 
-// TODO pull in server specific functions such as..
-//    - handling/managing socket connections
 function Server(config, channelRepo) {
     var port = config.port
     var welcomeMessage = config.welcomeMessage
@@ -228,8 +223,8 @@ function CommandFactory() {
     var executors = {
 	'JOIN': function(command, user, server) {
 	    var channelName = command.getArg('CHANNEL')
-	    if (channelStore.exist(channelName)) {
-		channelStore.addUserToChannel(channelName, user)
+	    if (channelRepo.exists(channelName)) {
+		channelRepo.addUserToChannel(channelName, user)
 	    }
 	},
 	'NICK': function(command, user, server) {
@@ -276,7 +271,6 @@ function CommandFactory() {
 	}
     }
 
-
     return {
 	createCommandFrom: function(user, line) {
 	    log.info('Creating command from [%s]', line)
@@ -311,7 +305,7 @@ function CommandFactory() {
 	    case 'JOIN':
 		var channelName = tokens[1]
 
-		argMap.put(Protocol.args.CHANNEL)
+		argMap.put('CHANNEL', channelName)
 
 		return new Command('JOIN', argMap, user, executors.JOIN)
 		break;
@@ -323,8 +317,6 @@ function CommandFactory() {
     }
 }
 
-
-// info about the user in irc domain
 function Member(client, server) {
     var client = client
     
@@ -336,7 +328,6 @@ function Member(client, server) {
     }
 }
 
-// info about the user in connection domain
 function User(connection, server, commandFactory) {
     var address = connection.getAddress()
     var socket = connection.getSocket()
@@ -350,8 +341,6 @@ function User(connection, server, commandFactory) {
     var userName = undefined
 
     function setUpDataHandler(user) {
-	// datahandler has access to user and server
-	// TODO test whether this is actually required
 	function dataHandler(data) {
 	    var dataString = data.toString()
 	    var lines = dataString.split("\n")
@@ -388,7 +377,8 @@ function User(connection, server, commandFactory) {
 	    try {
 		connection.send(params.join(' '))
 	    } catch (e) {
-		log.error('could not send message to client [%s] because of error [%s]', address, e)
+		log.error('could not send message to client [%s], caused by ...', address)
+		log.error(e.stack)
 	    }
 	},
 	getConnectionUuid: function() {
@@ -396,6 +386,9 @@ function User(connection, server, commandFactory) {
 	},
 	init: function() {
 	    socket.on('data', setUpDataHandler(this))
+	},
+	getNickName: function() {
+	    return nick
 	},
 	setNick: function(newNick) {
 	    log.info('Setting user \"Nick\" with connection UUID [%s] from [%s] to [%s]', this.getConnectionUuid(), nick, newNick)
