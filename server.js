@@ -217,7 +217,8 @@ function Server(config, channelRepo) {
 	    try {
 		command.execute(this)
 	    } catch (e) {
-		log.error('Error executing command [%s] due to error [%s]', command.getName(), e.toString())
+		log.error('Error executing command [%s], caused by ...', command.getName())
+		log.error(e.stack)
 	    }
 	}
     }
