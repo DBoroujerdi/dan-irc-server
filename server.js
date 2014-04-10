@@ -7,7 +7,6 @@ var uuid = require('node-uuid')
 //************************************************************
 // TODOs
 // welcome message lists channels that can be connected to
-// rename ircWirtable to clientStream or ircClientStream
 // create package.json
 // create readme.md
 // create config system to define default behaviour and features. eg. channels, welcome message
@@ -86,30 +85,37 @@ function Map() {
 // IRC Server
 //
 
-var protocol = {
+// TODO not sure why i decided to do this. might be better off with magic strings
+var Protocol = {
     commands: {
 	NICK: 'NICK',
-	JOIN: 'JOIN'
+	JOIN: 'JOIN',
+	KICK: 'KICK',
+	USER: 'USER'
+    },
+    args: {
+	NICKNAME: 'NICKNAME',
+	REAL_NAME: 'REAL_NAME',
+	CHANNEL: 'CHANNEL',
+	MODE: 'MODE',
+	USER: 'USER'
     }
 }
 
 function Channel(name, topic) {
-    var name = name
-    var topic = topic
+    this.name = name
+    this.topic = topic
     var members = new Set
 
     return {
-	getName: function() {
-	    return name
-	},
-	getTopic: function() {
-	    return topic
-	},
 	containsMember: function(member) {
 	    return members.contains(member)
 	},
 	addMember: function(member) {
 	    members.add(member)
+	    members.all().forEach(function(member) {
+		member.send('JOIN ' + member.nick)
+	    })
 	},
 	setTopic: function(newTopic) {
 	    topic = newTopic
@@ -118,7 +124,8 @@ function Channel(name, topic) {
 	    var membersString = ''
 	    var membersArray = members.getAll()
 	    membersArray.forEach(function(member) {
-		membersString = membersString + ' '
+		// TODO should be using nick name??
+		membersString = membersString + ' ' + member.name 
 	    })
 	    return membersString
 	}
@@ -136,9 +143,31 @@ function ClientStore() {
     }
 }
 
+function ChannelRepo() {
+    var channelsMap = new Map
+
+    return {
+	addChannels: function(channels) {
+	    channels.forEach(function(channel) {
+		log.info('Adding channel [%s] to ChannelRepo ...', channel.name)
+		channelsMap.put(channel.name, channel)
+	    })
+	},
+	addChannel: function(channel) {
+	    // TODO log
+	    channelsMap.put(channel.name, channel)
+	},
+	addUserToChannel: function(channelName, user) {
+	    log.info('adding user [%s] to channel [%s]', user.name, channelName)
+	    var channel = channelsMap.get(channelName)
+	    channel.addMember(user)
+	}
+    }
+}
+
 // TODO pull in server specific functions such as..
 //    - handling/managing socket connections
-function Server(config) {
+function Server(config, channelRepo) {
     var port = config.port
     var welcomeMessage = config.welcomeMessage
     var clients = new Map
@@ -148,11 +177,10 @@ function Server(config) {
     function createConnectionHandler(server) {
 	
 	function connectionHandler(socket) {
-	    // TODO generate uuid for user connection - npm install node-uuid
-	    
 	    var newUuid = uuid.v4()
 	    var connection = new Connection(newUuid, socket)
 	    var user = new User(connection, server, commandFactory)
+	    user.init()
 	    
 	    log.info('socket open with remote host [%s] and connection uuid [%s]', connection.getAddress(), newUuid.toString())
 	    connection.send(welcomeMessage)
@@ -161,7 +189,6 @@ function Server(config) {
 	return connectionHandler
     }
     
-
     function createChannels() {
 	var channels = []
 	config.channels.forEach(function(c) {
@@ -169,7 +196,7 @@ function Server(config) {
 	    var channel = new Channel(c.name, c.topic, this)
 	    channels.push(channel)
 	})
-	// TODO do something with this list of new channels
+	channelRepo.addChannels(config.channels)
     }
     
     return {
@@ -186,52 +213,73 @@ function Server(config) {
 		log.info('IRC server started listening on port [%s] ...', port)
 	    })
 	},
-	executeCommand: function(command, user) {
-	    log.info('executing command [%s] with args [%s]', command.getName(), command.getArgs())
-	    // TODO
+	executeCommand: function(command) {
+	    try {
+		command.execute(this)
+	    } catch (e) {
+		log.error('Error executing command [%s] due to error [%s]', command.getName(), e.toString())
+	    }
 	}
     }
 }
 
 function CommandFactory() {
 
-    function Command(name, args, user) {
-	return {
-	    getName: function() {
-		return name
-	    },
-	    getArgs: function() {
-		return args
-	    },
-	    getUser: function() {
-		return user
-	    },
-	    toString: function() {
-		// TODO user as well
-		return 'Command[' + name + ' Args[' + args.join() + ']]'
+    var executors = {
+	'JOIN': function(command, user, server) {
+	    var channelName = command.getArg('CHANNEL')
+	    if (channelStore.exist(channelName)) {
+		channelStore.addUserToChannel(channelName, user)
 	    }
+	},
+	'NICK': function(command, user, server) {
+	    var nickname = command.getArg('NICKNAME')
+	    
+	    // TODO should check nickname is not in use by anyone else
+	    // and return appropriate error codes
+	    // if nickname is different to current - rename and let everyone know
+	    user.setNick(nickname)
+	},
+	'USER': function(command, user, server) {
+	    log.warn('Not yet implemented executor for USER')
 	}
     }
 
     return {
 	createCommandFrom: function(user, line) {
 	    log.info('Creating command from [%s]', line)
+	    
 	    var tokens = line.split(' ')
 	    var command = tokens[0]
+	    var argMap = new Map
 	    
 	    switch (command) {
 	    case 'NICK':
 		var args = tokens.slice(1, tokens.length)
-		return new Command('NICK', args, user)
+		var nickName = tokens[1]
+
+		argMap.put(Protocol.args.NICKNAME, nickName)
+
+		return new Command('NICK', argMap, user, executors.NICK)
 		break;
 	    case 'USER':
 		var args = tokens.slice(1, tokens.length)
-		return new Command('USER', args, user)
+		var realName = tokens[4] + ' ' + tokens[5]
+		var user = tokens[1]
+		var mode = tokens[2]
+
+		argMap.put(Protocol.args.REALNAME, realName)
+		argMap.put(Protocol.args.MODE, mode)
+		argMap.put(Protocol.args.USER, user)
+		
+		return new Command('USER', argMap, user, executors.USER)
 		break;
 	    case 'JOIN':
-		var args = []
-		args[0] = tokens[1]
-		return new Command('JOIN', args, user)
+		var channelName = tokens[1]
+
+		argMap.put(Protocol.args.CHANNEL)
+
+		return new Command('JOIN', argMap, user, executors.JOIN)
 		break;
 	    default:
 		log.warn('Unkown command [' + command + '], ignoring ...')
@@ -240,6 +288,33 @@ function CommandFactory() {
 	}
     }
 }
+
+function Command(name, argsMap, user, executor) {
+    var name = name
+    var argsMap = argsMap
+    var executor = executor
+
+    return {
+	getName: function() {
+	    return name
+	},
+	execute: function(server) {
+	    log.info('Executing command [%s] ...', name)
+	    executor(this, user, server)
+	},
+	getArg: function(argName) {
+	    return argsMap.get(argName)
+	},
+	getUser: function() {
+	    return user
+	},
+	toString: function() {
+	    // TODO user as well
+	    return 'Command[' + name + ' Args[' + args.join() + ']]'
+	}
+    }
+}
+
 
 // info about the user in irc domain
 function Member(client, server) {
@@ -258,9 +333,10 @@ function User(connection, server, commandFactory) {
     var address = connection.getAddress()
     var socket = connection.getSocket()
     var connectionUuid = connection.getUuid()
+    var self = this
+    var nick = undefined
 
     function setUpDataHandler(user) {
-
 	// datahandler has access to user and server
 	// TODO test whether this is actually required
 	function dataHandler(data) {
@@ -285,9 +361,7 @@ function User(connection, server, commandFactory) {
 	    })
 
 	    commands.forEach(function(command) {
-		server.executeCommand(command, user)
-
-		// TODO now actually execute command ...
+		server.executeCommand(command)
 	    })
 	    
 	    log.info('%d commands received from [%s]', commands.length, connection.getAddress())
@@ -295,8 +369,6 @@ function User(connection, server, commandFactory) {
 
 	return dataHandler
     }
-
-    socket.on('data', setUpDataHandler(this))
 
     return {
 	send: function(params) {
@@ -306,27 +378,34 @@ function User(connection, server, commandFactory) {
 		log.error('could not send message to client [%s] because of error [%s]', address, e)
 	    }
 	},
+	setNick: function(newNick) {
+	    log.info('Setting user nick with connection UUID [%s] from [%s] to [%s]', this.getConnectionUuid(), nick, newNick)
+	    nick = newNick
+	},
 	getConnectionUuid: function() {
 	    return connection.getUuid()
+	},
+	init: function() {
+	    socket.on('data', setUpDataHandler(this))
 	}
     }
 }
 
-    // ircWritable.on('JOIN', function(d) {
-    // 	// TODO this logic should love elsewhere
-    // 	log.info(JSON.stringify(d))
-    // 	if (channels.contains(d.channel)) {
-    // 	    var channel = channels.get(d.channel)
-    // 	    if (!channel.containsMember(d.client)) {
-    // 		channel.addMember(d.client)
-    // 		var client = clients.get(d.client)
-    // 		client.write(channel.getTopic())
-    // 		client.write('/JOIN ' + channel.getName())
-    // 		client.write('/RPL_TOPIC ' + channel.getTopic())
-    // 		client.write('/RPL_NAMREPLY ' + d.client)
-    // 	    }
-    // 	}
-    // });
+// ircWritable.on('JOIN', function(d) {
+// 	// TODO this logic should love elsewhere
+// 	log.info(JSON.stringify(d))
+// 	if (channels.contains(d.channel)) {
+// 	    var channel = channels.get(d.channel)
+// 	    if (!channel.containsMember(d.client)) {
+// 		channel.addMember(d.client)
+// 		var client = clients.get(d.client)
+// 		client.write(channel.getTopic())
+// 		client.write('/JOIN ' + channel.getName())
+// 		client.write('/RPL_TOPIC ' + channel.getTopic())
+// 		client.write('/RPL_NAMREPLY ' + d.client)
+// 	    }
+// 	}
+// });
 
 function UserRepository(server) {
 
@@ -382,7 +461,9 @@ var config = {
     ]
 }
 
-var server = new Server(config)
+var userRepository = new UserRepository(server)
+var channelRepo = new ChannelRepo
+
+var server = new Server(config, channelRepo)
 server.start()
 
-var userRepository = new UserRepository(server)
