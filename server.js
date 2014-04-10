@@ -9,7 +9,6 @@ var uuid = require('node-uuid')
 // welcome message lists channels that can be connected to
 // create package.json
 // create readme.md
-// create config system to define default behaviour and features. eg. channels, welcome message
 //*************************************************************
 
 
@@ -420,22 +419,6 @@ function User(connection, server, commandFactory) {
 	}
     }
 }
-
-// ircWritable.on('JOIN', function(d) {
-// 	// TODO this logic should love elsewhere
-// 	log.info(JSON.stringify(d))
-// 	if (channels.contains(d.channel)) {
-// 	    var channel = channels.get(d.channel)
-// 	    if (!channel.containsMember(d.client)) {
-// 		channel.addMember(d.client)
-// 		var client = clients.get(d.client)
-// 		client.write(channel.getTopic())
-// 		client.write('/JOIN ' + channel.getName())
-// 		client.write('/RPL_TOPIC ' + channel.getTopic())
-// 		client.write('/RPL_NAMREPLY ' + d.client)
-// 	    }
-// 	}
-// });
 
 function UserRepository(server) {
 
