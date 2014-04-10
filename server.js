@@ -253,6 +253,30 @@ function CommandFactory() {
 	}
     }
 
+    function Command(name, argsMap, user, executor) {
+	var name = name
+	var argsMap = argsMap
+	var executor = executor
+
+	return {
+	    getName: function() {
+		return name
+	    },
+	    execute: function(server) {
+		log.info('Executing command [%s] ...', name)
+		executor(this, user, server)
+	    },
+	    getArg: function(argName) {
+		return argsMap.get(argName)
+	    },
+	    toString: function() {
+		// TODO user as well
+		return 'Command[' + name + ' Args[' + args.join() + ']]'
+	    }
+	}
+    }
+
+
     return {
 	createCommandFrom: function(user, line) {
 	    log.info('Creating command from [%s]', line)
@@ -295,29 +319,6 @@ function CommandFactory() {
 		log.warn('Unkown command [' + command + '], ignoring ...')
 		return undefined
 	    }
-	}
-    }
-}
-
-function Command(name, argsMap, user, executor) {
-    var name = name
-    var argsMap = argsMap
-    var executor = executor
-
-    return {
-	getName: function() {
-	    return name
-	},
-	execute: function(server) {
-	    log.info('Executing command [%s] ...', name)
-	    executor(this, user, server)
-	},
-	getArg: function(argName) {
-	    return argsMap.get(argName)
-	},
-	toString: function() {
-	    // TODO user as well
-	    return 'Command[' + name + ' Args[' + args.join() + ']]'
 	}
     }
 }
