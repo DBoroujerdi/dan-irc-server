@@ -114,8 +114,9 @@ function Channel(name, topic) {
 	    log.info('Adding user [%s] to channel [%s]', member.getNickName(), name)
 	    members.add(member)
 	    log.info('Notifying all members of channel [%s] ...', name)
+	    
 	    members.getAll().forEach(function(m) {
-		m.send(['/JOIN', name])
+		m.send([member.getPrefix(), 'JOIN', name])
 	    })
 	},
 	setTopic: function(newTopic) {
@@ -409,6 +410,10 @@ function User(connection, server, commandFactory) {
 	setMode: function(newMode) {
 	    log.info('Setting user \"Mode\" with connection UUID [%s] from [%s] to [%s]', this.getConnectionUuid(), mode, newMode)
 	    mode = newMode
+	},
+	// TODO find better name for this
+	getPrefix: function() {
+	    return ':' + nick + '!' + userName + '@' + hostName
 	}
     }
 }
