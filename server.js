@@ -163,6 +163,7 @@ function ChannelRepo() {
 }
 
 function Server(config, channelRepo) {
+    var name = config.name
     var port = config.port
     var welcomeMessage = config.welcomeMessage
     var clients = new Map
@@ -458,6 +459,7 @@ function Connection(uuid, socket) {
 //
 
 var config = {
+    name: 'dans-irc-server',
     port: 6667,
     welcomeMessage: 'Welcome to my IRC server ...',
     channels: [
