@@ -319,16 +319,6 @@ function CommandFactory() {
     }
 }
 
-function Member(client, server) {
-
-    return {
-        // TODO send should be more descriptive of function at irc level
-        send: function () {
-            client.send(arguments);
-        }
-    }
-}
-
 function User(connection, server, commandFactory) {
     var address = connection.getAddress();
     var socket = connection.getSocket();
